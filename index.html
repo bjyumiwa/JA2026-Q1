@@ -111,6 +111,29 @@
 </section>
 </main>
 <script>
+const LOG_ENDPOINT_URL = "https://script.google.com/macros/s/AKfycbyS9EwTNQL1CM_Z09ZuHhR6zajrVE0Yo8VjJC7zfNIvg4REWtT5DcIyDLMZXp0ETW92/exec";
+
+const APP_VERSION = "survey-v1";
+
+function sendLog(payload) {
+  const body = {
+    ...payload,
+    user_agent: navigator.userAgent,
+    app_version: APP_VERSION
+  };
+
+  fetch(LOG_ENDPOINT_URL, {
+    method: "POST",
+    mode: "no-cors",
+    headers: {
+      "Content-Type": "text/plain;charset=utf-8"
+    },
+    body: JSON.stringify(body)
+  }).catch(function(error) {
+    console.log("ログ送信エラー", error);
+  });
+}
+  
 const CONFIG = {
   GAS_ENDPOINT: "",
   CONTINUE_URL: "",
