@@ -32,6 +32,10 @@
   .scale-num { display:block; font-size:18px; font-weight:800; margin-bottom:2px; }
   .check-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
   .check-grid label { display:flex; gap:9px; align-items:flex-start; border:1px solid var(--line); border-radius:14px; padding:12px; background:#fffafd; cursor:pointer; line-height:1.5; font-size:14px; }
+  .demographic-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; max-width:660px; margin:18px auto 8px; }
+  .field-label { display:block; margin:0 0 8px; font-weight:800; color:#5d5362; font-size:14px; }
+  select { width:100%; border:1px solid var(--line); border-radius:16px; padding:13px 14px; font:inherit; color:var(--ink); background:#fffafd; outline:none; }
+  select:focus { border-color:var(--pink); box-shadow:0 0 0 4px rgba(255,127,179,.12); }
   textarea { width:100%; min-height:132px; resize:vertical; border:1px solid var(--line); border-radius:16px; padding:14px; font:inherit; line-height:1.7; outline:none; background:#fffafd; }
   textarea:focus { border-color:var(--pink); box-shadow:0 0 0 4px rgba(255,127,179,.12); }
   .btns { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin-top:24px; }
@@ -53,7 +57,7 @@
   .bar-fill { height:100%; border-radius:999px; background:linear-gradient(90deg,var(--pink),var(--purple)); width:0%; }
   .axis-value { text-align:right; font-weight:800; color:#66586d; } .mini-note { margin:12px 0 0; color:var(--muted); font-size:12.5px; line-height:1.65; text-align:center; }
   @media (max-width:720px) { .result-card { grid-template-columns:1fr; } .pet-frame { min-height:170px; } .axis-row { grid-template-columns:112px 1fr 48px; } }
-  @media (max-width:620px) { .scale { grid-template-columns:1fr; } .scale label { text-align:left; padding:12px 14px; } .scale-num { display:inline; margin-right:8px; } .check-grid { grid-template-columns:1fr; } button { width:100%; } .axis-row { grid-template-columns:1fr; gap:5px; } .axis-value { text-align:left; } }
+  @media (max-width:620px) { .demographic-grid { grid-template-columns:1fr; } .scale { grid-template-columns:1fr; } .scale label { text-align:left; padding:12px 14px; } .scale-num { display:inline; margin-right:8px; } .check-grid { grid-template-columns:1fr; } button { width:100%; } .axis-row { grid-template-columns:1fr; gap:5px; } .axis-value { text-align:left; } }
 </style>
 </head>
 <body>
@@ -64,6 +68,36 @@
 <section id="screenQuestions" class="screen active">
   <h1>5日間のふりかえり</h1>
   <p class="lead">5日間育てたキャラクターを思い出しながら答えてください。</p>
+
+  <div class="question">
+    <p class="question-title">はじめに、あなたについて教えてください。個人が特定される情報は書かないでください。</p>
+    <div class="demographic-grid">
+      <div>
+        <label class="field-label" for="ageGroup">年齢区分</label>
+        <select id="ageGroup" name="age_group" required>
+          <option value="">選択してください</option>
+          <option value="15-19">15〜19歳</option>
+          <option value="20-29">20〜29歳</option>
+          <option value="30-39">30〜39歳</option>
+          <option value="40-49">40〜49歳</option>
+          <option value="50-59">50〜59歳</option>
+          <option value="60+">60歳以上</option>
+          <option value="no_answer">答えたくない</option>
+        </select>
+      </div>
+      <div>
+        <label class="field-label" for="gender">性別</label>
+        <select id="gender" name="gender" required>
+          <option value="">選択してください</option>
+          <option value="female">女性</option>
+          <option value="male">男性</option>
+          <option value="other">その他</option>
+          <option value="no_answer">答えたくない</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
   <div id="likertArea"></div>
   <div class="question">
     <p class="question-title">同じ相棒かどうかを考えるとき、気になったところを選んでください。</p>
@@ -115,22 +149,20 @@ const LOG_ENDPOINT_URL = "https://script.google.com/macros/s/AKfycbyS9EwTNQL1CM_
 
 const APP_VERSION = "survey-v1";
 
-function sendLog(payload) {
+async function sendLog(payload) {
   const body = {
     ...payload,
     user_agent: navigator.userAgent,
     app_version: APP_VERSION
   };
 
-  fetch(LOG_ENDPOINT_URL, {
+  await fetch(LOG_ENDPOINT_URL, {
     method: "POST",
     mode: "no-cors",
     headers: {
       "Content-Type": "text/plain;charset=utf-8"
     },
     body: JSON.stringify(body)
-  }).catch(function(error) {
-    console.log("ログ送信エラー", error);
   });
 }
   
@@ -497,6 +529,8 @@ function renderLikert() {
   });
 }
 function getCheckedValues(name) { return Array.from(document.querySelectorAll(`input[name="${name}"]:checked`)).map(el=>el.value); }
+function getSelectValue(id) { const el=document.getElementById(id); return el ? el.value : ""; }
+function hasChecked(list, value) { return Array.isArray(list) && list.includes(value); }
 function getLikertAnswers() { const result={}; questions.forEach(q=>{ const checked=document.querySelector(`input[name="${q.key}"]:checked`); result[q.key]=checked?Number(checked.value):null; }); return result; }
 function validateLikert() { return questions.every(q=>document.querySelector(`input[name="${q.key}"]:checked`)); }
 function clamp(n,min=0,max=100) { return Math.max(min, Math.min(max, Math.round(n))); }
@@ -544,10 +578,86 @@ function pickPet(type, profile, answers) {
 function buildDiagnosis(answers) { const care=getCareLogProfile(answers); const type=pickDiagnosisType(care.profile); const pet=pickPet(type, care.profile, answers); const petMessage=PET_MESSAGES[pet.id] || type.message; return { type_key:type.key, pet_id:pet.id, pet_name:pet.name, pet_message:petMessage, pet_image:pet.image, profile_source:care.source, profile:care.profile }; }
 function renderProfile(profile) { document.getElementById('profileBox').innerHTML = Object.entries(profileAxisLabels).map(([key,label]) => `<div class="axis-row"><div class="axis-label">${label}</div><div class="bar-track"><div class="bar-fill" style="width:${profile[key]}%"></div></div><div class="axis-value">${profile[key]}%</div></div>`).join(''); }
 function renderDiagnosis(diagnosis) { document.getElementById('petImage').src=diagnosis.pet_image || ''; document.getElementById('petImage').alt=`${diagnosis.pet_name}のシルエット`; document.getElementById('petName').textContent=`${diagnosis.pet_name}です`; document.getElementById('diagnosisMessage').textContent=diagnosis.pet_message; renderProfile(diagnosis.profile); document.getElementById('profileNote').textContent = diagnosis.profile_source==='care_log_params_and_survey' ? 'この表示は、ゲーム側から渡されたお世話ログとアンケート回答をもとにした目安です。' : 'この表示は、お世話ログが未接続のときの仮表示です。ゲーム側からログを渡すと、ログに基づくプロフィールになります。'; }
-function buildPayload() { const answers=getLikertAnswers(); const conditionId=params.get('condition_id') || 'unknown'; const diagnosis=buildDiagnosis(answers); state.diagnosis=diagnosis; return { received_at_client:new Date().toISOString(), app_version:CONFIG.APP_VERSION, research_id:getResearchId(), condition_id:conditionId, condition_type:conditionMap[conditionId] || 'unknown', character_id:params.get('character_id') || 'unknown', language:params.get('language') || 'ja', day:params.get('day') || 'after_5days', first_feeling:state.firstFeeling, answers, identity_continuity_score:calculateIdentityScore(answers), noticed_parts:getCheckedValues('noticed_parts'), free_text:document.getElementById('freeText').value.trim(), partner_diagnosis:diagnosis, page_url:location.href, user_agent:navigator.userAgent }; }
+function buildPayload() {
+  const answers=getLikertAnswers();
+  const conditionId=params.get('condition_id') || 'unknown';
+  const noticedParts=getCheckedValues('noticed_parts');
+  const diagnosis=buildDiagnosis(answers);
+  state.diagnosis=diagnosis;
+
+  return {
+    received_at_client:new Date().toISOString(),
+    app_version:CONFIG.APP_VERSION,
+    research_id:getResearchId(),
+    condition_id:conditionId,
+    condition_type:conditionMap[conditionId] || 'unknown',
+    character_id:params.get('character_id') || 'unknown',
+    language:params.get('language') || 'ja',
+    day:params.get('day') || 'after_5days',
+
+    age_group:getSelectValue('ageGroup'),
+    gender:getSelectValue('gender'),
+
+    first_feeling:state.firstFeeling,
+    answers,
+    identity_continuity_score:calculateIdentityScore(answers),
+    noticed_parts:noticedParts,
+    free_text:document.getElementById('freeText').value.trim(),
+    partner_diagnosis:diagnosis,
+    page_url:location.href,
+    user_agent:navigator.userAgent
+  };
+}
+
+function buildSurveyLogPayload(payload) {
+  const answers = payload.answers || {};
+  const noticedParts = payload.noticed_parts || [];
+
+  return {
+    type: "survey_response",
+
+    research_id: payload.research_id,
+    condition_id: payload.condition_id,
+    character_id: payload.character_id,
+
+    age_group: payload.age_group,
+    gender: payload.gender,
+
+    same_identity_score: answers.same_existence || "",
+    attachment_score: answers.my_partner || "",
+    change_notice: noticedParts.join(","),
+
+    name_importance: hasChecked(noticedParts, "name") ? 1 : 0,
+    appearance_importance: hasChecked(noticedParts, "appearance") ? 1 : 0,
+    personality_importance: hasChecked(noticedParts, "behavior") ? 1 : 0,
+    memory_importance: hasChecked(noticedParts, "care_log") || hasChecked(noticedParts, "relationship") ? 1 : 0,
+
+    care_frequency_self: params.get("care_count") || params.get("total_care_count") || "",
+    felt_closeness: answers.relationship_continuity || "",
+    felt_strangeness: answers.change_makes_unsure || "",
+    wanted_to_continue: "",
+
+    free_text: payload.free_text,
+
+    details_json: {
+      source: "final_survey",
+      received_at_client: payload.received_at_client,
+      condition_type: payload.condition_type,
+      language: payload.language,
+      day: payload.day,
+      first_feeling: payload.first_feeling,
+      answers: payload.answers,
+      identity_continuity_score: payload.identity_continuity_score,
+      noticed_parts: payload.noticed_parts,
+      partner_diagnosis: payload.partner_diagnosis,
+      page_url: payload.page_url
+    }
+  };
+}
+
 async function sendPayload(payload) {
-  if (!CONFIG.GAS_ENDPOINT) { localStorage.setItem('identity_survey_last_payload', JSON.stringify(payload)); return { ok:true, fallback:true }; }
-  await fetch(CONFIG.GAS_ENDPOINT, { method:'POST', mode:'no-cors', headers:{ 'Content-Type':'text/plain;charset=utf-8' }, body:JSON.stringify(payload) });
+  localStorage.setItem('identity_survey_last_payload', JSON.stringify(payload));
+  await sendLog(buildSurveyLogPayload(payload));
   return { ok:true, fallback:false };
 }
 document.getElementById('surveyForm').addEventListener('submit', async event => {
